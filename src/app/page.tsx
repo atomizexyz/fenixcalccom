@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { StakeRow } from "@/components/StakeRow";
 import { StakeHeaderFooter } from "@/components/StakeHeaderFooter";
 import { useEffect, useState } from "react";
@@ -8,6 +9,7 @@ import * as yup from "yup";
 import { FENIX_INFLATION, MAX_STAKE_TERM, YEAR_DAYS } from "@/utilities/constants";
 import { GlobalData, StakeColumnData } from "@/models/models";
 import { v4 as uuidv4 } from "uuid";
+import { FenixCalcText } from "@/components/FenixCalcText";
 
 export default function Home() {
   const [globalData, setGlobalData] = useState<GlobalData>({ rewardPool: 0, equityPool: 0, totalShares: 0 });
@@ -90,22 +92,32 @@ export default function Home() {
   };
 
   const removeStake = (id: string) => {
-    const stakeColumnData = stakesColumnData.filter((stakeColumnData) => stakeColumnData.id !== id);
+    const newStakeColumnData = stakesColumnData.filter((stakeColumnData) => stakeColumnData.id !== id);
 
     const stakeToRemove = stakesColumnData.filter((stakeColumnData) => stakeColumnData.id === id)[0];
 
     const inflation = stakeToRemove.fenix * (1 + FENIX_INFLATION) ** (stakeToRemove.term / YEAR_DAYS);
-    const equityPool = globalData.equityPool - inflation;
-    const totalShares = globalData.totalShares - stakeToRemove.shares;
+
+    let equityPool = 0;
+    let totalShares = 0;
+
+    if (newStakeColumnData.length > 0) {
+      equityPool = globalData.equityPool - inflation;
+      totalShares = globalData.totalShares - stakeToRemove.shares;
+    }
 
     setGlobalData({ ...globalData, equityPool, totalShares });
 
-    setStakesColumnData(stakeColumnData);
+    setStakesColumnData(newStakeColumnData);
   };
   useEffect(() => {}, [globalData]);
 
   return (
     <main className="mx-auto max-w-7xl">
+      <div className="mx-auto py-8 flex justify-center space-x-2 items-center">
+        <Image className="h-10 w-auto" src="/images/fenix-logo.svg" alt="" width={32} height={32} />
+        <FenixCalcText className="primary-text w-48 h-6" />
+      </div>
       <dl className="mx-auto grid grid-cols-1 gap-px lg:grid-cols-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 primary-card px-4 py-10 sm:px-6 xl:px-8">
           <dt className="text-sm font-medium leading-6 secondary-text">Reward Pool</dt>
