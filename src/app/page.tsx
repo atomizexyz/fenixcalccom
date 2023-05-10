@@ -1,113 +1,196 @@
-import Image from 'next/image'
+"use client";
+import { StakeRow } from "@/components/StakeRow";
+import { StakeHeaderFooter } from "@/components/StakeHeaderFooter";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { FENIX_INFLATION, MAX_STAKE_TERM, YEAR_DAYS } from "@/utilities/constants";
+import { GlobalData, StakeColumnData } from "@/models/models";
+import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
+  const [globalData, setGlobalData] = useState<GlobalData>({ rewardPool: 0, equityPool: 0, totalShares: 0 });
+  const [stakesColumnData, setStakesColumnData] = useState<StakeColumnData[]>([]);
+
+  const rewardPoolSchema = yup
+    .object()
+    .shape({
+      rewardPool: yup
+        .number()
+        .required("Amount Required")
+        .max(100_000_000_000, `Maximum amount is ${Number(100_000_000_000).toLocaleString()}`)
+        .min(0, "Amount must be greater or equal to 0")
+        .typeError("Amount required"),
+    })
+    .required();
+
+  const { register: registerRewardPool, handleSubmit: handleSubmitRewardPool } = useForm({
+    mode: "onChange",
+    resolver: yupResolver(rewardPoolSchema),
+  });
+
+  const onUpdateRewardPool = (data: any) => {
+    const { rewardPool } = data;
+    setGlobalData({ ...globalData, rewardPool });
+  };
+
+  const addStakeSchema = yup
+    .object()
+    .shape({
+      fenix: yup
+        .number()
+        .required("Amount Required")
+        .max(100_000_000_000, `Maximum amount is ${Number(100_000_000_000).toLocaleString()}`)
+        .positive("Amount must be greater than 0")
+        .typeError("Amount required"),
+      term: yup
+        .number()
+        .required("Term Required")
+        .max(7_777, "Maximum term is 7_777")
+        .positive("Term must be greater than 0")
+        .typeError("Term required"),
+    })
+    .required();
+
+  const {
+    register,
+    handleSubmit: handleSubmitStake,
+    formState: { errors },
+  } = useForm({
+    mode: "onChange",
+    resolver: yupResolver(addStakeSchema),
+  });
+  const onSubmitStake = (data: any) => {
+    const { term, fenix } = data;
+
+    const id = uuidv4();
+    const timeBonus = 1 + term / MAX_STAKE_TERM;
+    const sizeBonus = 1 + (1 / fenix + 1);
+    const totalBonus = sizeBonus * Math.E ** timeBonus;
+    const inflation = fenix * (1 + FENIX_INFLATION) ** (term / YEAR_DAYS);
+    const shares = totalBonus * inflation;
+
+    const stakeColumnData: StakeColumnData = {
+      id,
+      fenix,
+      term,
+      timeBonus,
+      sizeBonus,
+      totalBonus,
+      shares,
+    };
+
+    const equityPool = globalData.equityPool + inflation;
+    const totalShares = globalData.totalShares + shares;
+    setGlobalData({ ...globalData, equityPool, totalShares });
+
+    stakesColumnData.push(stakeColumnData);
+    setStakesColumnData(stakesColumnData);
+  };
+
+  const removeStake = (id: string) => {
+    const stakeColumnData = stakesColumnData.filter((stakeColumnData) => stakeColumnData.id !== id);
+
+    const stakeToRemove = stakesColumnData.filter((stakeColumnData) => stakeColumnData.id === id)[0];
+
+    const inflation = stakeToRemove.fenix * (1 + FENIX_INFLATION) ** (stakeToRemove.term / YEAR_DAYS);
+    const equityPool = globalData.equityPool - inflation;
+    const totalShares = globalData.totalShares - stakeToRemove.shares;
+
+    setGlobalData({ ...globalData, equityPool, totalShares });
+
+    setStakesColumnData(stakeColumnData);
+  };
+  useEffect(() => {}, [globalData]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <main className="mx-auto max-w-7xl">
+      <dl className="mx-auto grid grid-cols-1 gap-px lg:grid-cols-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 primary-card px-4 py-10 sm:px-6 xl:px-8">
+          <dt className="text-sm font-medium leading-6 secondary-text">Reward Pool</dt>
+          <dd className="w-full flex-none text-3xl font-medium leading-10 tracking-tight primary-text">
+            <form onSubmit={handleSubmitRewardPool(onUpdateRewardPool)} className="flex flex-row">
+              <div className="flex flex-row space-x-2">
+                <input
+                  className="w-64 primary-input"
+                  type="number"
+                  step="any"
+                  placeholder="0"
+                  {...registerRewardPool("rewardPool", { required: true })}
+                />
+                <button
+                  type="submit"
+                  className="block rounded-md px-3 py-2 text-center text-sm font-semibold shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 primary-button"
+                >
+                  Update
+                </button>
+              </div>
+            </form>
+          </dd>
+        </div>
+
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 primary-card  px-4 py-10 sm:px-6 xl:px-8">
+          <dt className="text-sm font-medium leading-6 secondary-text">Equity Pool</dt>
+          <dd className="w-full flex-none text-3xl font-medium leading-10 tracking-tight primary-text">
+            {globalData.equityPool}
+          </dd>
+        </div>
+
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 primary-card  px-4 py-10 sm:px-6 xl:px-8">
+          <dt className="text-sm font-medium leading-6 secondary-text">Total Shares</dt>
+          <dd className="w-full flex-none text-3xl font-medium leading-10 tracking-tight primary-text">
+            {globalData.totalShares}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <div className="sm:flex sm:items-center">
+          <div className="sm:flex-auto">
+            <h1 className="text-base font-semibold leading-6 primary-text">Stakes</h1>
+          </div>
+          <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+            <form onSubmit={handleSubmitStake(onSubmitStake)} className="flex flex-row space-x-2">
+              <input
+                className="primary-input"
+                type="number"
+                step="any"
+                placeholder="FENIX"
+                {...register("fenix", { required: true })}
+              />
+              <input
+                className="primary-input"
+                type="number"
+                placeholder="TERM"
+                {...register("term", { required: true })}
+              />
+              <button
+                type="submit"
+                className="block rounded-md px-3 py-2 text-center text-sm font-semibold shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 primary-button"
+              >
+                Add Stake
+              </button>
+            </form>
+          </div>
+        </div>
+        <div className="mt-8 flow-root">
+          <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+              <table className="min-w-full divide-y primary-divide">
+                <StakeHeaderFooter />
+                <tbody className="divide-y primary-divide">
+                  {stakesColumnData.map((stakeColumnData) => (
+                    <tr key={stakeColumnData.id}>
+                      <StakeRow stakeColumnData={stakeColumnData} globalData={globalData} removeStake={removeStake} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://beta.nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
     </main>
-  )
+  );
 }
