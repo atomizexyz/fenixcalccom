@@ -3,11 +3,15 @@
 import { navigation } from "@/models/navigation";
 import Link from "next/link";
 import Disclaimer from "./Disclaimer";
+import Tutorial from "./Tutorial";
 
 export default function Footer() {
   return (
     <footer>
       <div className="mx-auto max-w-7xl overflow-hidden px-6 py-20 sm:py-24 lg:px-8">
+        <div className="pb-6">
+          <Tutorial />
+        </div>
         <div className="pb-6">
           <Disclaimer />
         </div>
